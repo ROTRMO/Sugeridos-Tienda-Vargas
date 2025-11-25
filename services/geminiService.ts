@@ -13,7 +13,9 @@ export const generateInventoryInsights = async (
   stats: InventoryStats,
   topCriticalItems: InventoryItem[],
   minStore: number,
-  minWarehouse: number
+  minWarehouse: number,
+  maxStore: number,
+  maxWarehouse: number
 ): Promise<string> => {
   try {
     const ai = initGenAI();
@@ -23,26 +25,28 @@ export const generateInventoryInsights = async (
       
       Configuration:
       - Minimum Stock Target per Bodega: ${minStore} units
+      - Maximum Stock Target per Bodega: ${maxStore} units
       - Minimum Stock Target for CEDI: ${minWarehouse} units
+      - Maximum Stock Target for CEDI: ${maxWarehouse} units
       
       Current Stats:
       - Total SKUs: ${stats.totalItems}
       - Total CEDI Stock: ${stats.totalWhStock}
       - Bodega 1 Total Stock: ${stats.totalS1Stock}
       - Bodega 6 Total Stock: ${stats.totalS2Stock}
-      - Items with Bodega Deficits: ${stats.itemsBelowMin}
-      - Total Suggested Purchase Order Qty: ${stats.totalPoNeeded}
+      - Total PO Suggested (Min/Max based): ${stats.totalPoNeeded}
+      - Total PO Suggested (Sales Based): ${stats.totalPoBySales}
 
-      Top 5 Critical Items (High PO Needs):
-      ${topCriticalItems.map(i => `- ${i.description} (ID: ${i.id}): CEDI=${i.whQty}, B1=${i.s1Qty}, B6=${i.s2Qty}, CEDI Deficit=${i.whDeficit}, Total PO=${i.poQty}`).join('\n')}
+      Top 5 Critical Items (Based on High Sales-Based PO Needs):
+      ${topCriticalItems.map(i => `- ${i.description} (ID: ${i.id}): Total 3M Sales=${i.total3MonthSales}, System Stock=${i.whQty + i.s1Qty + i.s2Qty}, Sales PO=${i.poBySales}`).join('\n')}
 
       Please provide a concise, bulleted executive summary. 
-      1. Highlights of the inventory health.
-      2. Specific actionable advice regarding stock balancing between Bodegas and CEDI replenishment.
-      3. Assessment of the current minimum stock levels (${minStore} for Bodegas, ${minWarehouse} for CEDI).
-      4. Urgency of the suggested purchase orders.
+      1. Highlights of the inventory health, specifically comparing if the stock is aligning with the 3-month sales history.
+      2. Specific actionable advice regarding stock balancing.
+      3. Assessment of the discrepancies between the Min/Max PO suggestion and the Sales-Based PO suggestion.
+      4. Urgency of the suggested purchase orders for high-selling items.
       
-      Keep it professional and under 200 words.
+      Keep it professional and under 250 words.
     `;
 
     const response = await ai.models.generateContent({

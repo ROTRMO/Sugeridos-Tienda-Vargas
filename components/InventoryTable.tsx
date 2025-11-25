@@ -48,12 +48,14 @@ const InventoryTable: React.FC<InventoryTableProps> = ({ items }) => {
             <tr>
               <th className="p-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-24">Item #</th>
               <th className="p-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Description</th>
+              <th className="p-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center bg-green-50">Total Sales (3M)</th>
               <th className="p-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center bg-gray-100">CEDI</th>
               <th className="p-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center bg-gray-100">Bodega 1</th>
               <th className="p-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center bg-gray-100">Bodega 6</th>
               <th className="p-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-blue-600 bg-blue-50 text-center">Transfer (CEDI)</th>
               <th className="p-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-purple-600 bg-purple-50 text-center">Transfer (Bodegas)</th>
-              <th className="p-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-rose-600 bg-rose-50 text-center">Buy (PO)</th>
+              <th className="p-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-rose-600 bg-rose-50 text-center">Buy (Min/Max)</th>
+              <th className="p-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-orange-600 bg-orange-50 text-center">Buy (Sales)</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -61,6 +63,8 @@ const InventoryTable: React.FC<InventoryTableProps> = ({ items }) => {
               <tr key={item.id} className="hover:bg-gray-50 transition-colors">
                 <td className="p-4 text-sm font-medium text-gray-900">{item.id}</td>
                 <td className="p-4 text-sm text-gray-600">{item.description}</td>
+                <td className="p-4 text-sm text-center font-bold text-green-700 bg-green-50/30">{item.total3MonthSales}</td>
+                
                 <td className="p-4 text-sm text-center font-mono bg-gray-50/50">{item.whQty}</td>
                 <td className="p-4 text-sm text-center font-mono bg-gray-50/50">
                   <span className={item.s1Qty < 5 ? "text-amber-600 font-bold" : ""}>{item.s1Qty}</span>
@@ -97,17 +101,24 @@ const InventoryTable: React.FC<InventoryTableProps> = ({ items }) => {
                   ) : <span className="text-gray-300">-</span>}
                 </td>
 
-                {/* Actions: PO */}
+                {/* Actions: PO Min/Max */}
                 <td className="p-4 text-sm text-center font-bold bg-rose-50/30">
                   {item.poQty > 0 ? (
                     <span className="text-rose-600">+{item.poQty}</span>
+                  ) : <span className="text-gray-300">-</span>}
+                </td>
+
+                 {/* Actions: PO Sales */}
+                <td className="p-4 text-sm text-center font-bold bg-orange-50/30">
+                  {item.poBySales > 0 ? (
+                    <span className="text-orange-600">+{item.poBySales}</span>
                   ) : <span className="text-gray-300">-</span>}
                 </td>
               </tr>
             ))}
             {currentItems.length === 0 && (
               <tr>
-                <td colSpan={8} className="p-8 text-center text-gray-500">
+                <td colSpan={10} className="p-8 text-center text-gray-500">
                   No items found matching your search.
                 </td>
               </tr>

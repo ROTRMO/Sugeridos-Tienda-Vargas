@@ -9,8 +9,13 @@ import { Settings, BarChart2, Bot, Loader2, Download, AlertCircle } from 'lucide
 
 const App: React.FC = () => {
   const [rawData, setRawData] = useState<any[]>([]);
+  // Min Settings
   const [minStoreStock, setMinStoreStock] = useState<number>(10);
   const [minWarehouseStock, setMinWarehouseStock] = useState<number>(50);
+  // Max Settings
+  const [maxStoreStock, setMaxStoreStock] = useState<number>(100);
+  const [maxWarehouseStock, setMaxWarehouseStock] = useState<number>(500);
+
   const [processedData, setProcessedData] = useState<InventoryItem[]>([]);
   const [stats, setStats] = useState<InventoryStats | null>(null);
   const [activeTab, setActiveTab] = useState<'dashboard' | 'table'>('dashboard');
@@ -22,14 +27,20 @@ const App: React.FC = () => {
 
   useEffect(() => {
     if (rawData.length > 0) {
-      const { processedItems, stats: newStats } = calculateBalancing(rawData, minStoreStock, minWarehouseStock);
+      const { processedItems, stats: newStats } = calculateBalancing(
+          rawData, 
+          minStoreStock, 
+          minWarehouseStock,
+          maxStoreStock,
+          maxWarehouseStock
+      );
       setProcessedData(processedItems);
       setStats(newStats);
       // Reset AI insights when data changes
       setAiInsights('');
       setAiError(false);
     }
-  }, [rawData, minStoreStock, minWarehouseStock]);
+  }, [rawData, minStoreStock, minWarehouseStock, maxStoreStock, maxWarehouseStock]);
 
   const handleDataLoaded = (data: any[]) => {
     setRawData(data);
@@ -41,13 +52,20 @@ const App: React.FC = () => {
     setIsAiLoading(true);
     setAiError(false);
     
-    // Sort by PO qty desc to find most critical
+    // Sort by Sales PO qty desc to find most critical based on SALES
     const criticalItems = [...processedData]
-      .sort((a, b) => b.poQty - a.poQty)
+      .sort((a, b) => b.poBySales - a.poBySales)
       .slice(0, 5);
 
     try {
-      const insights = await generateInventoryInsights(stats, criticalItems, minStoreStock, minWarehouseStock);
+      const insights = await generateInventoryInsights(
+          stats, 
+          criticalItems, 
+          minStoreStock, 
+          minWarehouseStock, 
+          maxStoreStock, 
+          maxWarehouseStock
+      );
       setAiInsights(insights);
     } catch (e) {
       setAiError(true);
@@ -57,23 +75,29 @@ const App: React.FC = () => {
   };
 
   const handleExport = () => {
-      // Simple CSV export logic for the browser
       if (processedData.length === 0) return;
       
       const headers = [
-          "Item ID", "Description", "UDS CEDI", "UDS B01", "UDS B06", 
-          "Faltante B01", "Faltante B06", "Faltante CEDI", "Trasl CEDI -> B01", "Trasl CEDI -> B06", 
-          "Trasl B01 -> B06", "Trasl B06 -> B01", "Sugerido Compra", "Status"
+          "Item ID", "Description", 
+          "Ventas Mes -2", "Ventas Mes -1", "Ventas Mes Actual", "Ventas Totales 3M",
+          "UDS CEDI", "UDS B01", "UDS B06", 
+          "Faltante B01", "Faltante B06", "Faltante CEDI", 
+          "Trasl CEDI -> B01", "Trasl CEDI -> B06", 
+          "Trasl B01 -> B06", "Trasl B06 -> B01", 
+          "Sugerido Compra (Min/Max)", "Sugerido Compra (Ventas)",
+          "Status"
       ];
       
       const rows = processedData.map(item => [
           item.id,
           `"${item.description.replace(/"/g, '""')}"`, // escape quotes
+          item.sales2MonthsAgo, item.sales1MonthAgo, item.salesCurrentMonth, item.total3MonthSales,
           item.whQty, item.s1Qty, item.s2Qty,
           item.s1Deficit, item.s2Deficit, item.whDeficit,
           item.whToS1, item.whToS2,
           item.s1ToS2, item.s2ToS1,
           item.poQty,
+          item.poBySales,
           item.status
       ]);
 
@@ -86,7 +110,7 @@ const App: React.FC = () => {
       const link = document.createElement("a");
       const url = URL.createObjectURL(blob);
       link.setAttribute("href", url);
-      link.setAttribute("download", `inventory_plan_minBodega${minStoreStock}_minCedi${minWarehouseStock}.csv`);
+      link.setAttribute("download", `inventory_plan_min${minStoreStock}_sales.csv`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -106,37 +130,61 @@ const App: React.FC = () => {
           
           {stats && (
             <div className="flex items-center gap-4">
-               <div className="flex items-center gap-3 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-200">
-                  <Settings className="w-4 h-4 text-gray-500" />
-                  
-                  <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
-                    <label className="flex items-center gap-2 text-xs font-medium text-gray-700">
-                      Min Bodega:
+               <div className="flex flex-col items-end gap-1">
+                 {/* Top Row: Min Settings */}
+                 <div className="flex items-center gap-2 bg-gray-50 px-3 py-1 rounded-lg border border-gray-100">
+                    <span className="text-[10px] font-bold text-gray-500 uppercase">Min Targets:</span>
+                    <label className="flex items-center gap-1 text-xs text-gray-700">
+                      Bodega:
                       <input 
                         type="number" 
                         min="0" 
                         value={minStoreStock}
                         onChange={(e) => setMinStoreStock(Math.max(0, parseInt(e.target.value) || 0))}
-                        className="w-16 px-1 py-1 border border-gray-300 rounded text-center focus:ring-1 focus:ring-blue-500 outline-none"
+                        className="w-12 px-1 py-0.5 border border-gray-300 rounded text-center outline-none"
                       />
                     </label>
-                    <div className="hidden sm:block w-px h-4 bg-gray-300"></div>
-                    <label className="flex items-center gap-2 text-xs font-medium text-gray-700">
-                      Min CEDI:
+                    <label className="flex items-center gap-1 text-xs text-gray-700">
+                      CEDI:
                       <input 
                         type="number" 
                         min="0" 
                         value={minWarehouseStock}
                         onChange={(e) => setMinWarehouseStock(Math.max(0, parseInt(e.target.value) || 0))}
-                        className="w-16 px-1 py-1 border border-gray-300 rounded text-center focus:ring-1 focus:ring-blue-500 outline-none"
+                        className="w-12 px-1 py-0.5 border border-gray-300 rounded text-center outline-none"
                       />
                     </label>
-                  </div>
+                 </div>
+
+                 {/* Bottom Row: Max Settings */}
+                 <div className="flex items-center gap-2 bg-gray-50 px-3 py-1 rounded-lg border border-gray-100">
+                    <span className="text-[10px] font-bold text-gray-500 uppercase">Max Limits:</span>
+                    <label className="flex items-center gap-1 text-xs text-gray-700">
+                      Bodega:
+                      <input 
+                        type="number" 
+                        min="0" 
+                        value={maxStoreStock}
+                        onChange={(e) => setMaxStoreStock(Math.max(0, parseInt(e.target.value) || 0))}
+                        className="w-12 px-1 py-0.5 border border-gray-300 rounded text-center outline-none"
+                      />
+                    </label>
+                    <label className="flex items-center gap-1 text-xs text-gray-700">
+                      CEDI:
+                      <input 
+                        type="number" 
+                        min="0" 
+                        value={maxWarehouseStock}
+                        onChange={(e) => setMaxWarehouseStock(Math.max(0, parseInt(e.target.value) || 0))}
+                        className="w-12 px-1 py-0.5 border border-gray-300 rounded text-center outline-none"
+                      />
+                    </label>
+                 </div>
                </div>
                
                <button 
                  onClick={handleExport}
-                 className="flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-blue-600 transition-colors bg-gray-50 hover:bg-gray-100 px-3 py-2 rounded-lg border border-gray-200"
+                 className="flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-blue-600 transition-colors bg-gray-50 hover:bg-gray-100 px-3 py-2 rounded-lg border border-gray-200 h-10"
                >
                  <Download className="w-4 h-4" />
                  <span className="hidden sm:inline">Export</span>
@@ -182,7 +230,7 @@ const App: React.FC = () => {
               {isAiLoading ? (
                 <div className="flex items-center gap-3 text-indigo-100 py-4">
                   <Loader2 className="w-5 h-5 animate-spin" />
-                  <span>Analyzing inventory patterns and generating purchasing strategy...</span>
+                  <span>Analyzing inventory vs sales velocity to generate purchasing strategy...</span>
                 </div>
               ) : aiInsights ? (
                 <div className="prose prose-invert max-w-none text-sm leading-relaxed bg-white/5 p-4 rounded-xl border border-white/10">
@@ -193,8 +241,8 @@ const App: React.FC = () => {
                 </div>
               ) : (
                 <p className="text-indigo-100 text-sm max-w-2xl">
-                  Get intelligent suggestions on transfer priorities and purchasing anomalies. 
-                  Click "Generate Report" to have AI analyze your {stats.totalItems} SKUs based on Min Bodega ({minStoreStock}) and Min CEDI ({minWarehouseStock}) levels.
+                  Get intelligent suggestions on transfer priorities and purchasing anomalies based on <strong>Sales History</strong> and Min/Max levels. 
+                  Click "Generate Report" to have AI analyze your {stats.totalItems} SKUs.
                 </p>
               )}
               {aiError && (
